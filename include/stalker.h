@@ -20,6 +20,6 @@ void InitializeDLLInjection(PBOOTSTRAP_INFO pInformation, PROCESS_INFORMATION PI
 
 char *dumpFolder;
 char bytecode[];
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 4096
 
 #endif

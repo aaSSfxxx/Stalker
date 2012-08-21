@@ -37,7 +37,12 @@ BOOL WINAPI handleWriteProcessMemory(HANDLE hProcess,LPVOID lpBaseAddress,LPCVOI
 	if(lpNumberOfBytesWritten != 0) {
 		*lpNumberOfBytesWritten = nSize;
 	}
-	return TRUE; // never fail :>
+	if(!inf.allowCall) {
+		return TRUE; // never fail :>
+	} 
+	else {
+		return lpWriteProcMem(hProcess, lpBaseAddress, lpBuffer, nSize, lpNumberOfBytesWritten);
+	}
 }
 
 DWORD WINAPI handleResumeThread (HANDLE hThread) {

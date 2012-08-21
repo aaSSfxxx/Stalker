@@ -14,39 +14,72 @@
 #include <stdio.h>
 #include "stalker.h"
 
-char bytecode[] = 	"`" // pushad
-					"jl" // push "l"
-					"he.dl" // push "e.dll"
-					"htrac" // push "trac"
-					"T" // push esp
+char bytecode[] = 	"\x90" // nop for debugging purposes
+					"\x60" // pushad
+					"\x6a\x6c" // push "l"
+					"\x68\x65\x2e\x64\x6c" // push "e.dll"
+					"\x68\x74\x72\x61\x63" // push "trac"
+					"\x54" // push esp
 					"\xb8\x04\x03\x02\x01" // mov eax,0x01020304 (to replace with our address of LoadLibrary
 					"\xff\xd0" // call eax
 					"\x83\xc4\x0c" // add esp, 0x0c
-					"a" // popad
+					"\x61" // popad
 					"\xe9\x04\x03\x02\x01"; // jmp OEP
 
-int main (int argc, char** argv)
-{
+void usage(char **argv) {
+	printf("Usage: %s [options...] executable\n"
+			   "    executable is mandatory and is the executable path\n"
+			   "    [-d dumpdir] is optional and specifies where the dumps will be written\n"
+			   "Options: \n"
+			   "    --allow-call, -a: lets the real WriteProcessMemory call occurs (by default, it is blocked)\n"
+			   "    --block-resume-thread, -b: blocks the \"ResumeThread\" calls\n"
+			   "    -d dumpdir: defines the directory where dumps will be written in\n", argv[0]);
+	exit(0);
+	
+}
+
+int main (int argc, char** argv) {
 	HANDLE hNamedPipe;
 	BOOTSTRAP_INFO info;
 	DWORD dwRead;
 	STARTUPINFOA SI;
     PROCESS_INFORMATION PI;
 	SERVICE_PACKET pack;
+	int i;
 	/* Parsing command line */
-	if(argc < 2 || argc > 3) {
-		printf("Usage: %s <executable> [dump_folder]\n"
-			   "    <executable> is mandatory and is the executable path\n"
-			   "    [dump_folder] is optional and specifies where the dumps will be written\n", argv[0]);
-		return 0;
-	}
 	dumpFolder = LocalAlloc(LPTR, 1000);
-	if(argc == 2) {
-		GetCurrentDirectory(1000, dumpFolder);
+	// Getting the dump directory
+	if(argc < 2) {
+		usage(argv);
 	}
-	else {
-		strncpy(dumpFolder, argv[2], 1000);
+	info.allowCall = FALSE;
+	info.noResume = FALSE;
+	// Loop for options
+	for(i = 1; i < argc-1; i++) {
+		if( strcmp(argv[i], "-d") != 0) {
+			GetCurrentDirectory(1000, dumpFolder);
+			if( strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "--allow-call") == 0) {
+				info.allowCall = TRUE;
+			}
+			else {
+				if( strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--block-resume-thread") == 0) {
+					info.noResume = TRUE;
+				}
+				else {
+					
+					printf("Unrecognized argument %s.\n", argv[i]);
+					usage(argv);
+				}
+			}
+		}
+		else {
+			strncpy(dumpFolder, argv[i + 1], 1000 - 1); // to have a null byte
+			i++;
+		}
+		
 	}
+	
+	
 	dwRead = strlen(dumpFolder) - 1;
 	if(dumpFolder[dwRead] == '\\') {
 		dumpFolder[dwRead] == '\0';
@@ -54,15 +87,15 @@ int main (int argc, char** argv)
 	printf("Dump folder is \"%s\"\n", dumpFolder);
 	printf("Creating IPC pipe.\n");
 	if( (hNamedPipe = CreateIPCPipe()) == INVALID_HANDLE_VALUE) {
+		printf("Couldn't create pipe. Aborting.\n");
 		exit(-1);
 	}
-	
 	printf ("Creating process.\n");
 	
 	/* Creating the process in the suspended way */
 	RtlZeroMemory(&SI, sizeof(SI));
     RtlZeroMemory(&PI, sizeof(PI));
-    if(!CreateProcess(argv[1], NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &SI, &PI))
+    if(!CreateProcess(argv[argc - 1], NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &SI, &PI))
 	{
 		printf("Unable to create process. Error code 0x%08x\n", (int)GetLastError());
 		exit(-1);
@@ -85,7 +118,7 @@ int main (int argc, char** argv)
 				notFinished = FALSE;
 			}
 			else {
-				printf ("Tried to write %d bytes to address 0x%08x of process %d\n", pack.Data2, pack.Data1, pack.Data3);
+				printf ("Tried to write %d bytes to address 0x%08x of PID %d\n", pack.Data2, pack.Data1, pack.Data3);
 			}
 		}
 		else {

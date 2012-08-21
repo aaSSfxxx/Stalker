@@ -59,7 +59,7 @@
 	/* Write the real address of LoadLibrary */
 	hLoadLibrary = GetModuleHandle("kernel32.dll");
 	hLoadLibrary = GetProcAddress(hLoadLibrary, "LoadLibraryA");
-	*(DWORD*)(bytecode + 15) = (DWORD)hLoadLibrary;
+	*(DWORD*)(bytecode + 16) = (DWORD)hLoadLibrary;
 	
 	/* Get the context of the main thread */
 	CTX->ContextFlags = CONTEXT_FULL;
@@ -72,10 +72,10 @@
 		printf("Coudln't allocate buffer. Error code 0x%x\n", (int)GetLastError());
 		exit(-1);
 	}
-	/* Compute offset to relative jump and replacing it*/
-	DWORD relJump = hOEP - (hNewOP + 25 + 5);
-	*(DWORD*)(bytecode + 26) = relJump;
-	WriteProcessMemory(PI.hProcess, hNewOP, bytecode, 30, &relJump); // don't want to pollute the stack with another var
+	/* Compute offset to relative jump and replacing it */
+	DWORD relJump = hOEP - (hNewOP + 26 + 5);
+	*(DWORD*)(bytecode + 27) = relJump;
+	WriteProcessMemory(PI.hProcess, hNewOP, bytecode, 40, &relJump); // don't want to pollute the stack with another var
 	CTX->Eax = (DWORD)hNewOP;
 	SetThreadContext(PI.hThread, CTX);
 	ResumeThread(PI.hThread);

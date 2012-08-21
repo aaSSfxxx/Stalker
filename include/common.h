@@ -19,6 +19,8 @@
 typedef struct _BOOTSTRAP_INFO {
 	char DumpDirectory[1000]; /* Directory to do the dump */
 	PVOID executableBase;
+	BOOL allowCall;
+	BOOL noResume;
 } BOOTSTRAP_INFO, *PBOOTSTRAP_INFO;
 
 /** Notifications sent by the injected DLL to the main program **/

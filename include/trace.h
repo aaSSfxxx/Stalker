@@ -22,9 +22,11 @@ BOOL placeEATHooking(PVOID hookProc, LPTSTR functionName, PVOID imgBase);
 // Hook functions (defined in hook.c)
 BOOL WINAPI handleWriteProcessMemory(HANDLE hProcess,LPVOID lpBaseAddress,LPCVOID lpBuffer,SIZE_T nSize,SIZE_T *lpNumberOfBytesWritten);
 DWORD WINAPI handleResumeThread (HANDLE hThread);
+//typedefs of functions
+typedef BOOL WINAPI (*LPWRITEPROCESSMEM)(HANDLE hProcess,LPVOID lpBaseAddress,LPCVOID lpBuffer,SIZE_T nSize,SIZE_T *lpNumberOfBytesWritten);
 
 // Variables used by the DLL
 HANDLE hFile; // handle of named pipe
 BOOTSTRAP_INFO inf; // informations sent by Stalker
-	
+LPWRITEPROCESSMEM lpWriteProcMem;
 #endif
