@@ -4,9 +4,9 @@ FLAGS=-Wall -nostdlib -g -I$(CURDIR)/include
 all: stalker.exe trace.dll
 	@echo "Build completed"
 
-stalker-gui: stalker/stalker-gui.o
+stalker-gui: stalker/stalker-gui.o stalker/functions.o
 	windres stalker/stalker-gui.rc stalker/stalker-res.o
-	$(CC) -o stalker-gui.exe stalker/stalker-gui.o stalker/stalker-res.o -lcomdlg32 -lshell32
+	$(CC) -o stalker-gui.exe stalker/stalker-gui.o stalker/functions.o stalker/stalker-res.o -lcomdlg32 -lshell32
 
 stalker.exe: stalker/stalker.o stalker/functions.o
 	$(CC) -o stalker.exe stalker/stalker.o stalker/functions.o

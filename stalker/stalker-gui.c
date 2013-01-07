@@ -6,8 +6,9 @@
 int CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void SelectDirectory (HWND hwnd);
 void SelectFile(HWND hwnd);
-void StalkerThread (PVOID args);
+DWORD WINAPI StalkerThread (PVOID args);
 
+char szCurDir[MAX_PATH];
 char bytecode[] = 	"\x90" // nop for debugging purposes
 					"\x60" // pushad
 					"\x6a\x6c" // push "l"
@@ -26,7 +27,7 @@ WinMain (HINSTANCE hInst,
 		 LPSTR lpCmdLine,
 		 int nCmdShow) 
 {
-	
+	GetCurrentDirectory (1024, szCurDir);
 	// Let's create a dialog !
 	DialogBoxParam (hInst, IDD_STALKERDLG, NULL, DialogProc, 0);
 }
@@ -47,8 +48,10 @@ int CALLBACK DialogProc(
 					SelectDirectory(hwndDlg);
 					break;
 				case IDOK:
-					EnableWindow(GetDlgItem( hWnd, IDOK ), FALSE);
+					SendDlgItemMessage( hwndDlg, IDC_RESULT, LB_RESETCONTENT, 0, 0);
+					EnableWindow(GetDlgItem( hwndDlg, IDOK ), FALSE);
 					CreateThread (NULL, NULL, StalkerThread, hwndDlg, NULL, NULL);
+					break;
 				case IDCANCEL:
 					EndDialog(hwndDlg, 0);
 				default:
@@ -64,7 +67,7 @@ int CALLBACK DialogProc(
 	return 1;
 }
 
-void StalkerThread (PVOID hwnd) {
+DWORD WINAPI StalkerThread (PVOID hwnd) {
 	char processPath [MAX_PATH+1];
 	char dumpFolder [MAX_PATH+1];
 	char szBuff[1024];
@@ -74,6 +77,8 @@ void StalkerThread (PVOID hwnd) {
 	STARTUPINFOA SI;
     PROCESS_INFORMATION PI;
 	SERVICE_PACKET pack;
+	BOOL notFinished = TRUE;
+	
 	if (GetDlgItemText( (HWND)hwnd, IDC_PROCESSPATH, processPath, MAX_PATH) == 0) {
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: no process given");
@@ -99,7 +104,7 @@ void StalkerThread (PVOID hwnd) {
 	/* Creating the process in the suspended way */
 	RtlZeroMemory(&SI, sizeof(SI));
     RtlZeroMemory(&PI, sizeof(PI));
-    if(!CreateProcess(processPath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &SI, &PI))
+    if(!CreateProcess(processPath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, szCurDir, &SI, &PI))
 	{
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: couldn't create process.");
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
@@ -113,8 +118,7 @@ void StalkerThread (PVOID hwnd) {
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 	}
 	WriteFile (hNamedPipe, &info, sizeof(info), &dwRead, 0);
-	
-	BOOL notFinished = TRUE;
+	SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Sending params to process...");
 	do {
 		if(ReadFile(hNamedPipe, &pack , sizeof(SERVICE_PACKET), &dwRead, 0)) {
 			if (pack.ServiceCode == CODE_ENDED) {
@@ -137,6 +141,7 @@ void StalkerThread (PVOID hwnd) {
 	DisconnectNamedPipe(hNamedPipe);
 	CloseHandle(hNamedPipe);
 	EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
+	return 0;
 }
 
 void SelectDirectory (HWND hwnd)
@@ -149,7 +154,7 @@ void SelectDirectory (HWND hwnd)
     bi.pidlRoot         =   NULL; 
     bi.pszDisplayName   =   szDisplayName; 
     bi.lpszTitle        =   "Please select a folder for storing dump files :"; 
-    bi.ulFlags          =   BIF_RETURNONLYFSDIRS;
+    bi.ulFlags          =   BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
     bi.lParam           =   NULL; 
     bi.iImage           =   0;  
 
