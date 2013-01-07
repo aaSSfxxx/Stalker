@@ -54,10 +54,10 @@ int main (int argc, char** argv) {
 	}
 	info.allowCall = FALSE;
 	info.noResume = FALSE;
+	GetCurrentDirectory(1000, dumpFolder);
 	// Loop for options
 	for(i = 1; i < argc-1; i++) {
 		if( strcmp(argv[i], "-d") != 0) {
-			GetCurrentDirectory(1000, dumpFolder);
 			if( strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "--allow-call") == 0) {
 				info.allowCall = TRUE;
 			}
