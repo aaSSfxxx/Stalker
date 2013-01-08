@@ -9,17 +9,6 @@ void SelectFile(HWND hwnd);
 DWORD WINAPI StalkerThread (PVOID args);
 
 char szCurDir[MAX_PATH];
-char bytecode[] = 	"\x90" // nop for debugging purposes
-					"\x60" // pushad
-					"\x6a\x6c" // push "l"
-					"\x68\x65\x2e\x64\x6c" // push "e.dll"
-					"\x68\x74\x72\x61\x63" // push "trac"
-					"\x54" // push esp
-					"\xb8\x04\x03\x02\x01" // mov eax,0x01020304 (to replace with our address of LoadLibrary
-					"\xff\xd0" // call eax
-					"\x83\xc4\x0c" // add esp, 0x0c
-					"\x61" // popad
-					"\xe9\x04\x03\x02\x01"; // jmp OEP
 
 int WINAPI
 WinMain (HINSTANCE hInst,
@@ -29,7 +18,8 @@ WinMain (HINSTANCE hInst,
 {
 	GetCurrentDirectory (1024, szCurDir);
 	// Let's create a dialog !
-	DialogBoxParam (hInst, IDD_STALKERDLG, NULL, DialogProc, 0);
+	DialogBoxParam (hInst, MAKEINTRESOURCE(IDD_STALKERDLG), NULL, DialogProc, 0);
+	return 1;
 }
 
 int CALLBACK DialogProc(
@@ -50,7 +40,7 @@ int CALLBACK DialogProc(
 				case IDOK:
 					SendDlgItemMessage( hwndDlg, IDC_RESULT, LB_RESETCONTENT, 0, 0);
 					EnableWindow(GetDlgItem( hwndDlg, IDOK ), FALSE);
-					CreateThread (NULL, NULL, StalkerThread, hwndDlg, NULL, NULL);
+					CreateThread (NULL, 0, StalkerThread, hwndDlg, 0, NULL);
 					break;
 				case IDCANCEL:
 					EndDialog(hwndDlg, 0);
@@ -82,18 +72,18 @@ DWORD WINAPI StalkerThread (PVOID hwnd) {
 	if (GetDlgItemText( (HWND)hwnd, IDC_PROCESSPATH, processPath, MAX_PATH) == 0) {
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: no process given");
-		return;
+		return 0;
 	}
 	if (GetDlgItemText( (HWND)hwnd, IDC_SAVEDUMPS, dumpFolder, MAX_PATH) == 0) {
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: no dump folder given");
-		return;
+		return 0;
 	}
 	
 	// Cleanup dump folder name
 	dwRead = strlen(dumpFolder) - 1;
 	if(dumpFolder[dwRead] == '\\') {
-		dumpFolder[dwRead] == '\0';
+		dumpFolder[dwRead] = '\0';
 	}
 	SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Creating IPC pipe...");
 	if( (hNamedPipe = CreateIPCPipe()) == INVALID_HANDLE_VALUE) {
@@ -126,7 +116,7 @@ DWORD WINAPI StalkerThread (PVOID hwnd) {
 				notFinished = FALSE;
 			}
 			else {
-				snprintf (szBuff, sizeof(szBuff), "Tried to write %d bytes to address 0x%08x of PID %d", pack.Data2, pack.Data1, pack.Data3);
+				wsprintf (szBuff, "Tried to write %d bytes to address 0x%08x of PID %d", (int)pack.Data2, (int)pack.Data1, (int)pack.Data3);
 				SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)szBuff);
 				
 			}
@@ -155,7 +145,7 @@ void SelectDirectory (HWND hwnd)
     bi.pszDisplayName   =   szDisplayName; 
     bi.lpszTitle        =   "Please select a folder for storing dump files :"; 
     bi.ulFlags          =   BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-    bi.lParam           =   NULL; 
+    bi.lParam           =   0; 
     bi.iImage           =   0;  
 
     LPITEMIDLIST pidl   =   SHBrowseForFolder(&bi);

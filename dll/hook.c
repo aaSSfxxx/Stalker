@@ -19,17 +19,17 @@ HANDLE hOutFile = 0;
 BOOL WINAPI handleWriteProcessMemory(HANDLE hProcess,LPVOID lpBaseAddress,LPCVOID lpBuffer,SIZE_T nSize,SIZE_T *lpNumberOfBytesWritten) {
 	DWORD dwRead;
 	SERVICE_PACKET shut;
-	char fileName[1024];
+	char fileName[MAX_PATH+1024];
 	if(futureAddress != lpBaseAddress) {
 		if(hOutFile != 0) {
 			CloseHandle(hOutFile);
 		}
-		snprintf(fileName, 1024, "%s/dump_%x.dmp", inf.DumpDirectory, lpBaseAddress); 
+		wsprintf(fileName, "%s/dump_%x.dmp", inf.DumpDirectory, (int)lpBaseAddress); 
 		hOutFile = CreateFile(fileName , GENERIC_READ | GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, 0 , NULL);
 		shut.ServiceCode = CODE_GOT_CALL;
-		shut.Data1 = lpBaseAddress;
+		shut.Data1 = (int)lpBaseAddress;
 		shut.Data2 = nSize;
-		shut.Data3 = hProcess;
+		shut.Data3 = (int)hProcess;
 		WriteFile(hFile, &shut, sizeof(SERVICE_PACKET), &dwRead, 0);
 	}
 	WriteFile(hOutFile, lpBuffer, nSize, &dwRead, 0);

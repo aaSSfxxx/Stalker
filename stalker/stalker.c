@@ -14,18 +14,6 @@
 #include <stdio.h>
 #include "stalker.h"
 
-char bytecode[] = 	"\x90" // nop for debugging purposes
-					"\x60" // pushad
-					"\x6a\x6c" // push "l"
-					"\x68\x65\x2e\x64\x6c" // push "e.dll"
-					"\x68\x74\x72\x61\x63" // push "trac"
-					"\x54" // push esp
-					"\xb8\x04\x03\x02\x01" // mov eax,0x01020304 (to replace with our address of LoadLibrary
-					"\xff\xd0" // call eax
-					"\x83\xc4\x0c" // add esp, 0x0c
-					"\x61" // popad
-					"\xe9\x04\x03\x02\x01"; // jmp OEP
-
 void usage(char **argv) {
 	printf("Usage: %s [options...] executable\n"
 			   "    executable is mandatory and is the executable path\n"
@@ -82,7 +70,7 @@ int main (int argc, char** argv) {
 	
 	dwRead = strlen(dumpFolder) - 1;
 	if(dumpFolder[dwRead] == '\\') {
-		dumpFolder[dwRead] == '\0';
+		dumpFolder[dwRead] = '\0';
 	}
 	printf("Dump folder is \"%s\"\n", dumpFolder);
 	printf("Creating IPC pipe.\n");
@@ -118,7 +106,7 @@ int main (int argc, char** argv) {
 				notFinished = FALSE;
 			}
 			else {
-				printf ("Tried to write %d bytes to address 0x%08x of PID %d\n", pack.Data2, pack.Data1, pack.Data3);
+				printf ("Tried to write %d bytes to address 0x%08x of PID %d\n", (int)pack.Data2, (int)pack.Data1, (int)pack.Data3);
 			}
 		}
 		else {

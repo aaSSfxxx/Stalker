@@ -14,6 +14,18 @@
  #include <stdio.h>
  #include "stalker.h"
  
+ char bytecode[] = 	"\x90" // nop for debugging purposes
+					"\x60" // pushad
+					"\x6a\x6c" // push "l"
+					"\x68\x65\x2e\x64\x6c" // push "e.dll"
+					"\x68\x74\x72\x61\x63" // push "trac"
+					"\x54" // push esp
+					"\xb8\x04\x03\x02\x01" // mov eax,0x01020304 (to replace with our address of LoadLibrary
+					"\xff\xd0" // call eax
+					"\x83\xc4\x0c" // add esp, 0x0c
+					"\x61" // popad
+					"\xe9\x04\x03\x02\x01"; // jmp OEP
+
 /** This functions creates an named pipe used by Stalker and the hooking DLL **/
  HANDLE CreateIPCPipe() {
 	/* Communication pipe */
@@ -33,8 +45,8 @@
 	if (hNamedPipe == INVALID_HANDLE_VALUE)
     {
 		printf("CreateNamedPipe failed\n");
-        return hNamedPipe;
     }
+	return hNamedPipe;
  }
  
  BOOL WaitForConnection (HANDLE hNamedPipe) {
@@ -66,7 +78,7 @@
 	GetThreadContext(PI.hThread, CTX);
 	hOEP = (LPVOID)CTX->Eax;
 	//pInformation->executableBase = INTO (CTX->Ebx + 8);
-	ReadProcessMemory(PI.hProcess, CTX->Ebx + 8, &pInformation->executableBase , 4, NULL);
+	ReadProcessMemory(PI.hProcess, (LPVOID)((int)(CTX->Ebx) + 8), &pInformation->executableBase , 4, NULL);
 	if( !( hNewOP = VirtualAllocEx(PI.hProcess, NULL, 50, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE) ) )
 	{
 		printf("Coudln't allocate buffer. Error code 0x%x\n", (int)GetLastError());
@@ -79,5 +91,4 @@
 	CTX->Eax = (DWORD)hNewOP;
 	SetThreadContext(PI.hThread, CTX);
 	ResumeThread(PI.hThread);
- 
  }

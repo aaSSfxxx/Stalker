@@ -17,9 +17,10 @@
 
 HANDLE CreateIPCPipe();
 void InitializeDLLInjection(PBOOTSTRAP_INFO pInformation, PROCESS_INFORMATION PI);
+BOOL WaitForConnection (HANDLE hNamedPipe);
 
 char *dumpFolder;
-char bytecode[];
+char bytecode[1024];
 #define BUFFER_SIZE 4096
 
 #endif
