@@ -18,7 +18,6 @@
 /** Structure filled by Stalker when the DLL is loaded **/
 typedef struct _BOOTSTRAP_INFO {
 	char DumpDirectory[1000]; /* Directory to do the dump */
-	PVOID executableBase;
 	BOOL allowCall;
 	BOOL noResume;
 } BOOTSTRAP_INFO, *PBOOTSTRAP_INFO;

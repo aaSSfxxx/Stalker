@@ -16,7 +16,6 @@
 #include "common.h"
 
 HANDLE CreateIPCPipe();
-void InitializeDLLInjection(PBOOTSTRAP_INFO pInformation, PROCESS_INFORMATION PI);
 BOOL WaitForConnection (HANDLE hNamedPipe);
 void HookCreateThread();
 
