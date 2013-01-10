@@ -20,18 +20,17 @@ int APIENTRY DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID lpReserved) {
 	switch(dwReason) {
 		case DLL_PROCESS_ATTACH:
 			//Create the communication pipe
+			Sleep (1000);
 			hFile = CreateFile("\\\\.\\pipe\\StalkerWPMTrack", GENERIC_READ | GENERIC_WRITE, 0 , NULL, OPEN_EXISTING, 0 , NULL);
 			ReadFile(hFile,&inf , sizeof(BOOTSTRAP_INFO), &dwRead, 0);
 		
 			//Place hooks for WriteProcessMemory
 			krnl32 = GetModuleHandle("kernel32.dll");
 			lpWriteProcMem = (LPWRITEPROCESSMEM) GetProcAddress(krnl32, "WriteProcessMemory");
-			placeHook(handleWriteProcessMemory, GetProcAddress(krnl32, "WriteProcessMemory"), inf.executableBase);
 			placeEATHooking(handleWriteProcessMemory, "WriteProcessMemory", krnl32);
 			
 			//Place hooks for ResumeThread if asked
 			if(inf.noResume == TRUE) {
-				placeHook(handleResumeThread, GetProcAddress(krnl32, "ResumeThread"), inf.executableBase);
 				placeEATHooking(handleResumeThread, "ResumeThread", krnl32);
 			}
 			

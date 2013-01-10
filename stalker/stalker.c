@@ -83,12 +83,13 @@ int main (int argc, char** argv) {
 	/* Creating the process in the suspended way */
 	RtlZeroMemory(&SI, sizeof(SI));
     RtlZeroMemory(&PI, sizeof(PI));
-    if(!CreateProcess(argv[argc - 1], NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &SI, &PI))
+	HookCreateThread();
+    if(!CreateProcess(argv[argc - 1], NULL, NULL, NULL, FALSE, 0, NULL, NULL, &SI, &PI))
 	{
 		printf("Unable to create process. Error code 0x%08x\n", (int)GetLastError());
 		exit(-1);
 	}
-	InitializeDLLInjection(&info, PI);
+	//InitializeDLLInjection(&info, PI);
 	
 	// Fill structure
 	strncpy(info.DumpDirectory, dumpFolder, 1000);

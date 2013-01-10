@@ -45,29 +45,6 @@ void DisableDebugPrivilege() {
     CloseHandle(handle2);
     CloseHandle(handle1);
 }
-// Provides an IAT hooking
-BOOL placeHook(PVOID hookProc, PVOID addressToHook, PVOID imgBase) {
-	PVOID import;
-    PIMAGE_NT_HEADERS headers = imgBase + INTO (imgBase + 0x3c); // Get PE header
-    PIMAGE_IMPORT_DESCRIPTOR desc = imgBase + 
-		headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-	do {
-		import = imgBase + desc->FirstThunk;
-        do {
-            if(INTO import == (DWORD)addressToHook)
-            {
-				DWORD oldProtect;
-                VirtualProtect(import, 4, PAGE_READWRITE, &oldProtect);
-                CopyMemory(import, &hookProc, 4);
-                VirtualProtect(import, 4, oldProtect, &oldProtect);
-				return TRUE;
-            }
-            import += 4;
-        } while( INTO (import));
-        desc = desc + 1;
-    } while (desc->Name != 0);
-	return FALSE;
-}
 
 //Does EAT hooking
 BOOL placeEATHooking(PVOID hookProc, LPTSTR functionName, PVOID imgBase) {

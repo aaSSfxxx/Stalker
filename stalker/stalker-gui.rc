@@ -20,7 +20,7 @@ CAPTION "Stalker v1.1 - by aaSSfxxx"
 FONT 8, "Ms Shell Dlg"
 {
     DEFPUSHBUTTON   "Trace", IDOK, 63, 175, 50, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 121, 175, 50, 14
+    PUSHBUTTON      "Exit", IDCANCEL, 121, 175, 50, 14
     LTEXT           "Process to launch:", IDC_STATIC, 5, 8, 60, 8, SS_LEFT
     EDITTEXT        IDC_PROCESSPATH, 69, 6, 140, 12, ES_AUTOHSCROLL
     PUSHBUTTON      "...", IDC_SELECTPROCESS, 212, 6, 11, 12

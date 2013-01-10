@@ -69,6 +69,7 @@ DWORD WINAPI StalkerThread (PVOID hwnd) {
 	SERVICE_PACKET pack;
 	BOOL notFinished = TRUE;
 	
+	// Grab parameters
 	if (GetDlgItemText( (HWND)hwnd, IDC_PROCESSPATH, processPath, MAX_PATH) == 0) {
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: no process given");
@@ -94,22 +95,32 @@ DWORD WINAPI StalkerThread (PVOID hwnd) {
 	/* Creating the process in the suspended way */
 	RtlZeroMemory(&SI, sizeof(SI));
     RtlZeroMemory(&PI, sizeof(PI));
-    if(!CreateProcess(processPath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, szCurDir, &SI, &PI))
+    
+	// Initializes hooks to ZwCreateThread to inject our payload before creating process' primary thread
+	HookCreateThread();
+	
+	// Runs the process
+	if(!CreateProcess(processPath, NULL, NULL, NULL, FALSE, 0, NULL, szCurDir, &SI, &PI))
 	{
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: couldn't create process.");
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 	}
-	InitializeDLLInjection(&info, PI);
-	// Fill structure
+	
+	// Fills the structures
 	strncpy(info.DumpDirectory, dumpFolder, 1000);
 	info.allowCall = (IsDlgButtonChecked ( (HWND)hwnd, IDC_CHECKPROCESSMEM) == BST_CHECKED) ? TRUE : FALSE;
 	info.noResume = (IsDlgButtonChecked ( (HWND)hwnd, IDC_CHECKRESUMETHREAD) == BST_CHECKED) ? TRUE : FALSE;
+	
+	// Wait for connection (block the program until it's finished)
 	if( !WaitForConnection(hNamedPipe) ) {
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 	}
+	
+	// Send initial data to the named pipe
 	WriteFile (hNamedPipe, &info, sizeof(info), &dwRead, 0);
 	SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Sending params to process...");
 	do {
+		// Receive child process' notifications
 		if(ReadFile(hNamedPipe, &pack , sizeof(SERVICE_PACKET), &dwRead, 0)) {
 			if (pack.ServiceCode == CODE_ENDED) {
 				SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"[SUCCESS] Process terminated");
@@ -122,11 +133,11 @@ DWORD WINAPI StalkerThread (PVOID hwnd) {
 			}
 		}
 		else {
-			//printf("Subprocess had a problem.\n");
 			SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: subprocess had a problem.");
 			notFinished = FALSE;
 		}
 	} while(notFinished);
+	// Cleanup and exit
 	FlushFileBuffers(hNamedPipe);
 	DisconnectNamedPipe(hNamedPipe);
 	CloseHandle(hNamedPipe);

@@ -14,18 +14,78 @@
  #include <stdio.h>
  #include "stalker.h"
  
- char bytecode[] = 	"\x90" // nop for debugging purposes
+char origBytes[5];
+char bytecode[] =   "\x90" // nop for debugging purposes
 					"\x60" // pushad
-					"\x6a\x6c" // push "l"
-					"\x68\x65\x2e\x64\x6c" // push "e.dll"
-					"\x68\x74\x72\x61\x63" // push "trac"
-					"\x54" // push esp
-					"\xb8\x04\x03\x02\x01" // mov eax,0x01020304 (to replace with our address of LoadLibrary
+					"\x68\x04\x03\x02\x01" // push module handle ret
+					"\x68\x04\x03\x02\x01" // push PUNICODE_STRING
+					"\x6a\x00" // push 0 (Flags)
+					"\x6a\x00" // push 0 (Path to file)
+					"\xb8\x04\x03\x02\x01" // mov eax,0x01020304 (to replace with our address of LdrLoadDll)
 					"\xff\xd0" // call eax
-					"\x83\xc4\x0c" // add esp, 0x0c
 					"\x61" // popad
-					"\xe9\x04\x03\x02\x01"; // jmp OEP
+					"\x68\x04\x03\x02\x01" // push OEP 
+					"\xc3";
+					
 
+LPZWCREATETHREAD pOrigCreateThread;
+
+void EnableDebugPrivilege() {
+	TOKEN_PRIVILEGES privilege;
+    LUID Luid;
+    HANDLE handle1;
+    HANDLE handle2;
+    handle1 = OpenProcess(PROCESS_ALL_ACCESS, FALSE, GetCurrentProcessId());
+    OpenProcessToken(handle1, TOKEN_ALL_ACCESS, &handle2);
+    LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &Luid);
+    privilege.PrivilegeCount = 1;
+    privilege.Privileges[0].Luid = Luid;
+    privilege.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    AdjustTokenPrivileges(handle2, FALSE, &privilege, sizeof(privilege), NULL, NULL);
+    CloseHandle(handle2);
+    CloseHandle(handle1);
+}
+
+DWORD WINAPI CreateThreadHook (PHANDLE  	ThreadHandle,
+		DWORD  	DesiredAccess,
+		PVOID ObjectAttributes,
+		HANDLE  	ProcessHandle,
+		PVOID  	ClientId,
+		PCONTEXT  	ThreadContext,
+		PVOID  	UserStack,
+		BOOLEAN  	CreateSuspended 
+	) 
+{
+	LPVOID memPage;
+    UNICODE_STRING str;
+	DWORD temp;
+	WCHAR tapz[] = L"trace.dll";
+	temp = (DWORD)GetModuleHandle("ntdll.dll");
+	temp = (DWORD)GetProcAddress((HANDLE)temp, "LdrLoadDll");
+	//17
+	*((DWORD*)((int)bytecode + 17)) = temp;
+	
+	if( !( memPage = VirtualAllocEx(ProcessHandle, NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE) ) )
+	{
+		printf("Coudln't allocate buffer. Error code 0x%x\n", (int)GetLastError());
+		exit(-1);
+	}
+	str.Length = 20;
+	str.MaximumLength = 22;
+	str.Buffer = (LPVOID)(((int)memPage) + 10);
+	*((DWORD*)((int)bytecode + 3)) = (DWORD)(((int)memPage) + 500);
+	*((DWORD*)((int)bytecode + 8)) = (DWORD)memPage;
+	*((DWORD*)((int)bytecode + 25)) = ThreadContext->Eip;
+	// Writes the buffer into RAM
+	WriteProcessMemory (ProcessHandle, (LPVOID)memPage, &str, sizeof(UNICODE_STRING), &temp);
+	WriteProcessMemory (ProcessHandle, (LPVOID)(((int)memPage) + 10), (HANDLE)tapz, 22, &temp);
+	WriteProcessMemory (ProcessHandle, (LPVOID)(((int)memPage) + 50), bytecode, 200, &temp);
+
+	ThreadContext->Eip = (DWORD)(((int)memPage) + 50);
+	CopyMemory((LPVOID)pOrigCreateThread, &origBytes, 5);
+	return pOrigCreateThread (ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, ClientId, ThreadContext, UserStack, CreateSuspended);
+	//28
+}
 /** This functions creates an named pipe used by Stalker and the hooking DLL **/
  HANDLE CreateIPCPipe() {
 	/* Communication pipe */
@@ -42,10 +102,6 @@
         NMPWAIT_USE_DEFAULT_WAIT,   // Time-out interval
         NULL                        // Security attributes
     );
-	if (hNamedPipe == INVALID_HANDLE_VALUE)
-    {
-		printf("CreateNamedPipe failed\n");
-    }
 	return hNamedPipe;
  }
  
@@ -54,41 +110,37 @@
     {
 		if (ERROR_PIPE_CONNECTED != GetLastError())
         {
-            printf("ConnectNamedPipe failed\n");
-			DisconnectNamedPipe(hNamedPipe);
+            DisconnectNamedPipe(hNamedPipe);
 			CloseHandle(hNamedPipe);
             return FALSE;
         }
+		return TRUE;
 	}
-	return TRUE;
+	return FALSE;
 }
-/** This function prepares the target executable to load our DLL **/
- void InitializeDLLInjection(PBOOTSTRAP_INFO pInformation, PROCESS_INFORMATION PI) {
-	LPVOID hOEP, hNewOP;
-	HANDLE hLoadLibrary;
-	PCONTEXT CTX = VirtualAlloc(NULL, sizeof(CTX), MEM_COMMIT, PAGE_READWRITE);
 
-	/* Write the real address of LoadLibrary */
-	hLoadLibrary = GetModuleHandle("kernel32.dll");
-	hLoadLibrary = GetProcAddress(hLoadLibrary, "LoadLibraryA");
-	*(DWORD*)(bytecode + 16) = (DWORD)hLoadLibrary;
+ void HookCreateThread() {
+	DWORD temp, oldProtect;
+	// Get address of ZwCreateThread
+	temp = (DWORD)GetModuleHandle("ntdll.dll");
+	temp = (DWORD)GetProcAddress((HANDLE)temp, "ZwCreateThread");
 	
-	/* Get the context of the main thread */
-	CTX->ContextFlags = CONTEXT_FULL;
-	GetThreadContext(PI.hThread, CTX);
-	hOEP = (LPVOID)CTX->Eax;
-	//pInformation->executableBase = INTO (CTX->Ebx + 8);
-	ReadProcessMemory(PI.hProcess, (LPVOID)((int)(CTX->Ebx) + 8), &pInformation->executableBase , 4, NULL);
-	if( !( hNewOP = VirtualAllocEx(PI.hProcess, NULL, 50, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE) ) )
+	// Save the address into a global variable
+	pOrigCreateThread = (LPZWCREATETHREAD)(temp);
+	
+	// Build trampoline
+	char trampoline[] = "\xe9\x01\x02\x03\x04";
+	*((DWORD*)(trampoline + 1)) = (DWORD)CreateThreadHook - (5 + temp);
+	
+	// Get right to hook
+	EnableDebugPrivilege();
+	if(!VirtualProtect((PVOID)temp, 5, PAGE_EXECUTE_READWRITE, &oldProtect))
 	{
-		printf("Coudln't allocate buffer. Error code 0x%x\n", (int)GetLastError());
-		exit(-1);
+		printf("I fail'd faggot \n");
+		exit (-1);
 	}
-	/* Compute offset to relative jump and replacing it */
-	DWORD relJump = hOEP - (hNewOP + 26 + 5);
-	*(DWORD*)(bytecode + 27) = relJump;
-	WriteProcessMemory(PI.hProcess, hNewOP, bytecode, 40, &relJump); // don't want to pollute the stack with another var
-	CTX->Eax = (DWORD)hNewOP;
-	SetThreadContext(PI.hThread, CTX);
-	ResumeThread(PI.hThread);
+	// Save the original bytes and write the trampoline instead
+	CopyMemory(origBytes, (PVOID)temp, 5);
+	CopyMemory((PVOID)temp, &trampoline, 5);
  }
+ 
