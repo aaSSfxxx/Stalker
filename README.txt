@@ -11,4 +11,7 @@ malwares with it).
 
 TODO: 
  - add hooks to NtCreateProcess to catch processes created by the tracked process
- - maybe make a GUI ?
+
+CHANGELOG:
+ - Stalker now supports tracing of .NET applications
+ - DLL injection rewritten
