@@ -5,7 +5,7 @@ all: stalker.exe trace.dll stalker-gui.exe
 	@echo Build completed
 
 stalker-gui.exe: stalker/stalker-gui.o stalker/functions.o stalker/stalker-gui.obj
-	$(CC) -o stalker-gui.exe stalker/stalker-gui.o stalker/functions.o stalker/stalker-gui.obj -lcomdlg32 -lshell32
+	$(CC) -o stalker-gui.exe -Wl,--subsystem,windows stalker/stalker-gui.o stalker/functions.o stalker/stalker-gui.obj -lcomdlg32 -lshell32
 
 stalker.exe: stalker/stalker.o stalker/functions.o stalker/stalker-gui.obj
 	$(CC) -o stalker.exe stalker/stalker.o stalker/functions.o stalker/stalker-gui.obj

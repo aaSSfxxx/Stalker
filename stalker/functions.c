@@ -116,7 +116,7 @@ DWORD WINAPI CreateThreadHook (PHANDLE  	ThreadHandle,
         }
 		return TRUE;
 	}
-	return FALSE;
+	return TRUE;
 }
 
  void HookCreateThread() {
