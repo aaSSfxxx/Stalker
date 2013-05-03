@@ -96,15 +96,13 @@ DWORD WINAPI StalkerThread (PVOID hwnd) {
 	RtlZeroMemory(&SI, sizeof(SI));
     RtlZeroMemory(&PI, sizeof(PI));
     
-	// Initializes hooks to ZwCreateThread to inject our payload before creating process' primary thread
-	HookCreateThread();
-	
 	// Runs the process
-	if(!CreateProcess(processPath, NULL, NULL, NULL, FALSE, 0, NULL, szCurDir, &SI, &PI))
+	if(!CreateProcess(processPath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, szCurDir, &SI, &PI))
 	{
 		SendDlgItemMessage( (HWND)hwnd, IDC_RESULT, LB_ADDSTRING, 0, (LPARAM)"Fatal: couldn't create process.");
 		EnableWindow(GetDlgItem( (HWND)hwnd, IDOK ), TRUE);
 	}
+	InitializeDLLInjection(PI);
 	
 	// Fills the structures
 	strncpy(info.DumpDirectory, dumpFolder, 1000);

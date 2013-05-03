@@ -14,7 +14,6 @@
  #include <stdio.h>
  #include "stalker.h"
  
-char origBytes[5];
 char bytecode[] =   "\x90" // nop for debugging purposes
 					"\x60" // pushad
 					"\x68\x04\x03\x02\x01" // push module handle ret
@@ -27,8 +26,6 @@ char bytecode[] =   "\x90" // nop for debugging purposes
 					"\x68\x04\x03\x02\x01" // push OEP 
 					"\xc3";
 					
-
-LPZWCREATETHREAD pOrigCreateThread;
 
 void EnableDebugPrivilege() {
 	TOKEN_PRIVILEGES privilege;
@@ -46,45 +43,50 @@ void EnableDebugPrivilege() {
     CloseHandle(handle1);
 }
 
-DWORD WINAPI CreateThreadHook (PHANDLE  	ThreadHandle,
-		DWORD  	DesiredAccess,
-		PVOID ObjectAttributes,
-		HANDLE  	ProcessHandle,
-		PVOID  	ClientId,
-		PCONTEXT  	ThreadContext,
-		PVOID  	UserStack,
-		BOOLEAN  	CreateSuspended 
-	) 
+void InitializeDLLInjection(PROCESS_INFORMATION PI)
 {
-	LPVOID memPage;
+	HANDLE memPage;
     UNICODE_STRING str;
 	DWORD temp;
+	CONTEXT ctx;
 	WCHAR tapz[] = L"trace.dll";
+	
+	// Gets thread context
+	ctx.ContextFlags = CONTEXT_FULL;
+	GetThreadContext(PI.hThread, &ctx);
+	
+	// Gets LdrLoadDll address and patch it into the shellcode
 	temp = (DWORD)GetModuleHandle("ntdll.dll");
 	temp = (DWORD)GetProcAddress((HANDLE)temp, "LdrLoadDll");
-	//17
 	*((DWORD*)((int)bytecode + 17)) = temp;
 	
-	if( !( memPage = VirtualAllocEx(ProcessHandle, NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE) ) )
+	// Allocates our working page
+	if( !( memPage = VirtualAllocEx(PI.hProcess, NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE) ) )
 	{
 		printf("Coudln't allocate buffer. Error code 0x%x\n", (int)GetLastError());
 		exit(-1);
 	}
-	str.Length = 20;
-	str.MaximumLength = 22;
+	// Creates an unicode string
+	str.Length = 18;
+	str.MaximumLength = 20;
 	str.Buffer = (LPVOID)(((int)memPage) + 10);
+	
+	// patch module handle address (returned by LdrLoadDll)
 	*((DWORD*)((int)bytecode + 3)) = (DWORD)(((int)memPage) + 500);
+	// patch UNICODE_STRING address
 	*((DWORD*)((int)bytecode + 8)) = (DWORD)memPage;
-	*((DWORD*)((int)bytecode + 25)) = ThreadContext->Eip;
-	// Writes the buffer into RAM
-	WriteProcessMemory (ProcessHandle, (LPVOID)memPage, &str, sizeof(UNICODE_STRING), &temp);
-	WriteProcessMemory (ProcessHandle, (LPVOID)(((int)memPage) + 10), (HANDLE)tapz, 22, &temp);
-	WriteProcessMemory (ProcessHandle, (LPVOID)(((int)memPage) + 50), bytecode, 200, &temp);
-
-	ThreadContext->Eip = (DWORD)(((int)memPage) + 50);
-	CopyMemory((LPVOID)pOrigCreateThread, &origBytes, 5);
-	return pOrigCreateThread (ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, ClientId, ThreadContext, UserStack, CreateSuspended);
-	//28
+	// Patch EIP address (used in the trick push/ret)
+	*((DWORD*)((int)bytecode + 25)) = ctx.Eip;
+	//Write all this sh*t
+	WriteProcessMemory (PI.hProcess, (LPVOID)memPage, &str, sizeof(UNICODE_STRING), &temp);
+	WriteProcessMemory (PI.hProcess, (LPVOID)(((int)memPage) + 10), (HANDLE)tapz, 20, &temp);
+	WriteProcessMemory (PI.hProcess, (LPVOID)(((int)memPage) + 50), bytecode, 200, &temp);
+	// Set our new eip
+	ctx.Eip = (DWORD)(((int)memPage) + 50);
+	
+	//Set context
+	SetThreadContext(PI.hThread, &ctx);	
+	ResumeThread(PI.hThread);
 }
 /** This functions creates an named pipe used by Stalker and the hooking DLL **/
  HANDLE CreateIPCPipe() {
@@ -118,29 +120,4 @@ DWORD WINAPI CreateThreadHook (PHANDLE  	ThreadHandle,
 	}
 	return TRUE;
 }
-
- void HookCreateThread() {
-	DWORD temp, oldProtect;
-	// Get address of ZwCreateThread
-	temp = (DWORD)GetModuleHandle("ntdll.dll");
-	temp = (DWORD)GetProcAddress((HANDLE)temp, "ZwCreateThread");
-	
-	// Save the address into a global variable
-	pOrigCreateThread = (LPZWCREATETHREAD)(temp);
-	
-	// Build trampoline
-	char trampoline[] = "\xe9\x01\x02\x03\x04";
-	*((DWORD*)(trampoline + 1)) = (DWORD)CreateThreadHook - (5 + temp);
-	
-	// Get right to hook
-	EnableDebugPrivilege();
-	if(!VirtualProtect((PVOID)temp, 5, PAGE_EXECUTE_READWRITE, &oldProtect))
-	{
-		printf("I fail'd faggot \n");
-		exit (-1);
-	}
-	// Save the original bytes and write the trampoline instead
-	CopyMemory(origBytes, (PVOID)temp, 5);
-	CopyMemory((PVOID)temp, &trampoline, 5);
- }
  

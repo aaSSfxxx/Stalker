@@ -18,9 +18,7 @@
 HANDLE CreateIPCPipe();
 BOOL WaitForConnection (HANDLE hNamedPipe);
 void HookCreateThread();
-
-typedef DWORD (*LPZWCREATETHREAD) (PHANDLE ThreadHandle, DWORD DesiredAccess, PVOID ObjectAttributes, HANDLE ProcessHandle, 
-                                   PVOID ClientId, PCONTEXT ThreadContext, PVOID UserStack, BOOLEAN CreateSuspended);
+void InitializeDLLInjection(PROCESS_INFORMATION PI);
 
 typedef struct _LSA_UNICODE_STRING {
   USHORT Length;
